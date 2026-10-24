@@ -11,6 +11,7 @@ const {
   Stock_Adjustment_History,
   Master_Warehouse_Rack,
   Master_Modal,
+  Master_Product_Price,
 } = require("../../models");
 const StockAdjustmentHistoryService = require("../stockAdjustmentHistory/StockAdjustmentHistoryService");
 
@@ -21,7 +22,7 @@ class ProductWarehouseTransformationService {
         where: {
           id,
         },
-        attributes: ["productId", "unitId"]
+        attributes: ["productId", "unitId", "warehouseId"]
       })
 
       if (!dataProduct) {
@@ -48,7 +49,38 @@ class ProductWarehouseTransformationService {
         ]
       })
 
-      return listData
+      // Stok dan harga dasar unit tujuan, supaya dialog transformasi bisa
+      // menampilkan hasilnya sebelum disimpan.
+      const unitToIds = listData.map(item => item.unitToId)
+      const [destinationStocks, destinationPrices] = await Promise.all([
+        Warehouse_Product.findAll({
+          where: {
+            productId: dataProduct.productId,
+            warehouseId: dataProduct.warehouseId,
+            unitId: unitToIds,
+          },
+          attributes: ["unitId", "quantity"],
+        }),
+        Master_Product_Price.findAll({
+          where: {
+            productId: dataProduct.productId,
+            unitId: unitToIds,
+          },
+          attributes: ["unitId", "basePrice", "basePricePos"],
+        }),
+      ])
+
+      return listData.map(item => {
+        const stock = destinationStocks.find(row => row.unitId === item.unitToId)
+        const price = destinationPrices.find(row => row.unitId === item.unitToId)
+
+        return {
+          ...item.toJSON(),
+          targetQuantity: stock ? Number(stock.quantity) : 0,
+          targetBasePrice: price?.basePrice != null ? Number(price.basePrice) : null,
+          targetBasePricePos: price?.basePricePos != null ? Number(price.basePricePos) : null,
+        }
+      })
     } catch (error) {
       throw error
     }

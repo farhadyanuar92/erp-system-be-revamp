@@ -177,6 +177,7 @@ class ProductWarehouseService {
         quantity: data.quantity,
         minimumStock: data.minimumStock,
         warehouseRackId: data?.Master_Warehouse_Rack?.id,
+        rackName: data?.Master_Warehouse_Rack?.name,
       };
 
       return result;
